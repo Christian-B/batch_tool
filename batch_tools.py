@@ -121,14 +121,50 @@ class RegexChecker:
         return False
 
 
-class DirectoryLister:
+class FileSizeChecker:
+    """Superclass of classes that could check the size of a file"""
+    
+    def __init__(self, maximum_size=None, minimum_size=None):
+        if maximum_size is None:
+            if minimum_size is None:
+                self.size_wrong = self.never_wrong
+            else:
+                self.minimum_size = minimum_size
+                self.size_wrong = self.too_small
+        else:        
+            self.maximum_size = maximum_size
+            if minimum_size is None:
+                self.size_wrong = self.too_big
+            else:
+                self.minimum_size = minimum_size
+                self.size_wrong = self.outside_range
+                
+    def never_wrong(self, path):
+        return False            
+                
+    def too_small(self, path):
+        return os.path.getsize(path) < self.minimum_size
+                 
+    def too_big(self, path):
+        #print path
+        #print os.path.getsize(path) 
+        #print os.path.getsize(path) > self.maximum_size
+        return os.path.getsize(path) > self.maximum_size
+
+    def outside_range(self, path):
+        size = os.path.getsize(path)
+        if (size < self.minimum_size):
+            return True
+        return os.path.getsize(path) > self.maximum_size
+
+class DirectoryLister(FileSizeChecker):
     """Creates a list (to file) of the all suitable directories
 
     A directory is conidered suitable if
     Neither its name or any of its parents match the ignore_regexes
     It contains ALL of the required files
     """
-    def __init__(self, list_file, ignore_regexes=[], required_files=[], check_path=None, list_path=None):
+    def __init__(self, list_file, ignore_regexes=[], required_files=[], check_path=None, list_path=None, maximum_size=None, minimum_size=None):
         """Sets up the class and stores all parameteres
 
         ignore_regexes: Pattern of all directories to ignore
@@ -139,6 +175,7 @@ class DirectoryLister:
             list in a different place
             if the path starts with check_path that is replaced with list_path
         """
+        FileSizeChecker.__init__(self, maximum_size, minimum_size)
         self.ignore_patterns = []
         for regex in ignore_regexes:
             self.ignore_patterns.append(re.compile(regex))
@@ -174,9 +211,15 @@ class DirectoryLister:
             required_path = os.path.join(path, required_file)
             if not os.path.exists(required_path):
                 # Ignore directory but check its children!
-                if verbose:
-                    print "ignoring", path, "as it is missing", required_file
+                #if verbose:
+                #    print "ignoring", path, "as it is missing", required_file
                 return True
+            else:
+                if (self.size_wrong(required_path)):
+                    # Ignore directory but check its children!
+                    if verbose:
+                        print "ignoring", path, "as", required_file, "is the wrong size"
+                    return True                
         if self.check_path:
             if path.startswith(self.check_path):
                 path = self.list_path + path[len(self.check_path): ]
@@ -190,7 +233,7 @@ class DirectoryLister:
 
 class Copier:
     """Copies the files into seperate directories"""
-    def __init__(self, endings_mappings, target_parent=os.getcwd()):
+    def __init__(self, endings_mappings, target_parent=os.getcwd()): 
         """Copies the files macthing endings_mappings into target_parent
 
         endings_mappings is a dictionary of regex terms to file endings
@@ -210,7 +253,7 @@ class Copier:
             raise Exception("endings_mappings must be a dictionary")
         for(regex, file_name) in endings_mappings.items():
             pattern = re.compile(regex)
-            self.endings_mappings[pattern] = file_name
+            self.endings_mappings[pattern] = file_name            
 
     def __act_on_files__(self, old_path, new_path, verbose=True):
         copy_if_new(old_path, new_path, verbose=verbose)
@@ -519,17 +562,23 @@ __MERGE__ = "merge"
 __COMMANDS__ = [__FIND__, __LIST__, __BATCH__, __EXTRACT__, __DELIMIT__, __MERGE__]
 
 """Parameter names"""
+#__AFTER_DATE__ = "AFTER_DATE"
 __BATCH_SCRIPT__ = "BATCH_SCRIPT"
 __COPY__ = "COPY"
 __DELIMITER__ = "DELIMITER"
 __EXTRACT_PREFIX__ = "EXTRACT_PREFIX"
 __FILE_LIST__ = "FILE_LIST"
 __LISTp__ = "LIST"
+__MINIMUM_SIZE__ = "MINIMUM_SIZE"
+__MAXIMUM_SIZE__ = "MAXIMUM_SIZE"  #short = x
 __OUTPUT_DIR__ = "OUTPUT_DIR"
 __PARENT__ = "PARENT"
 __QSUB_SCRIPT__ = "QSUB_SCRIPT"
 __SOURCE__ = "SOURCE"
+#__UPTO_DATE__ = "UPTO_DATE"
 __VERBOSE__ = "VERBOSE"
+#X" used for maximum
+
 #Directory lister ignore
 #Directory lister check vs list path
 
@@ -555,7 +604,7 @@ if __name__ == '__main__':
                   "Default is the current directory")
     find_group.add_option(short(__PARENT__), longer(__PARENT__), dest=__PARENT__, action="store", type="string",
                   default=os.getcwd(),
-                  help=__PARENT__ + "directory of the sub directories to hold the data for each run "
+                  help=__PARENT__ + " directory of the sub directories to hold the data for each run "
                   "Default is the current directory")
     parent_option = find_group.get_option(longer(__PARENT__))
     find_group.add_option(short(__FILE_LIST__), longer(__FILE_LIST__) , dest=__FILE_LIST__ , action="append", type="string",
@@ -565,6 +614,13 @@ if __name__ == '__main__':
                        "Format can just name if find not specified"
                        "Multiple values allowed.")
     file_list_option = find_group.get_option(longer(__FILE_LIST__ ))
+    find_group.add_option(short(__MINIMUM_SIZE__), longer(__MINIMUM_SIZE__) , dest=__MINIMUM_SIZE__ , action="store", type="long",
+                  help="Minimum size in bytes that a file must have to be used.")
+    minimum_size_option = find_group.get_option(longer(__MINIMUM_SIZE__))
+    find_group.add_option("-X", longer(__MAXIMUM_SIZE__) , dest=__MAXIMUM_SIZE__ , action="store", type="long",
+                  help="Maximum size in bytes that a file must have to be used.")
+    maximum_size_option = find_group.get_option(longer(__MAXIMUM_SIZE__))
+    
     find_group.add_option(short(__COPY__), longer(__COPY__), action="store_true", dest=__COPY__, default=False,
                   help="(Optional) If specified will copy the original file to the new location. "
                        "Otherwise just the path to the original file is saved.")
@@ -579,6 +635,8 @@ if __name__ == '__main__':
                      )
     list_group.option_list.append(parent_option)
     list_group.option_list.append(file_list_option)
+    list_group.option_list.append(minimum_size_option)
+    list_group.option_list.append(maximum_size_option)
     list_group.add_option(short(__LISTp__), longer(__LISTp__), dest=__LISTp__, action="store", type="string",
                   default="directories.txt",
                   help="File to hold the list of directories. "
@@ -613,6 +671,8 @@ if __name__ == '__main__':
                      "Placed in the " + __OUTPUT_DIR__ )
     extract_group.option_list.append(parent_option)
     extract_group.option_list.append(file_list_option)
+    extract_group.option_list.append(minimum_size_option)
+    extract_group.option_list.append(maximum_size_option)
     extract_group.add_option(short(__EXTRACT_PREFIX__), longer(__EXTRACT_PREFIX__), dest=__EXTRACT_PREFIX__,
                   action="append", type="string",
                   help="Prefix of the line to extract information from.")
@@ -630,6 +690,8 @@ if __name__ == '__main__':
                      "Placed in the " + __OUTPUT_DIR__ )
     batch_group.option_list.append(parent_option)
     batch_group.option_list.append(file_list_option)
+    batch_group.option_list.append(minimum_size_option)
+    batch_group.option_list.append(maximum_size_option)
     batch_group.add_option(short(__DELIMITER__), longer(__DELIMITER__), dest=__DELIMITER__, action="store", type="string",
                   help="Delimiter to create extract information files with."
                        "Will look in all files in the directories specified by parent that are in the file_list."
@@ -646,6 +708,8 @@ if __name__ == '__main__':
                      "Placed in the " + __OUTPUT_DIR__ )
     merge_group.option_list.append(parent_option)
     merge_group.option_list.append(file_list_option)
+    merge_group.option_list.append(minimum_size_option)
+    merge_group.option_list.append(maximum_size_option)
     merge_group.option_list.append(outout_option)
     parser.add_option_group(merge_group)
 
@@ -723,7 +787,8 @@ if __name__ == '__main__':
         print "Writing list of directories in", options.__dict__[__PARENT__], "to", options.__dict__[__LISTp__]
         print "Only directories that have all these files are included: "
         print required_files
-        lister = DirectoryLister(list_file=options.__dict__[__LISTp__], required_files=required_files)  # , check_path="~/temp", list_path="/Junk")
+        lister = DirectoryLister(list_file=options.__dict__[__LISTp__], required_files=required_files, 
+                                 minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__]) 
         do_walk(source=options.__dict__[__PARENT__], directory_action=lister.list_directory, file_action=approve_none,
                 verbose=options.__dict__[__VERBOSE__])
         if options.__dict__[__VERBOSE__]:
