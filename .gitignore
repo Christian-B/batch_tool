@@ -1,6 +1,9 @@
 #Backu Files
 *~
 
+#output folder used in examples
+output/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
