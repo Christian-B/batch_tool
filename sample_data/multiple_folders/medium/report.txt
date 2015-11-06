@@ -1,0 +1,5 @@
+This is a small manualll cretaed example of a post processing report.
+
+Lines | 5
+Size | 140 B
+
