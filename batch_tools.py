@@ -31,19 +31,22 @@ def check_parent(parent):
     if parent:
         if not os.path.isdir(parent):
             if os.path.isfile(parent):
-                report_error("parent: " + parent + " is a file.")
+                report_error("parent: " + parent + " is a file.")            
             grand_parent = os.path.dirname(os.path.normpath(parent))
-            if os.path.isdir(grand_parent):
-                os.mkdir(parent, 0744)
+            if (grand_parent):
+                if os.path.isdir(grand_parent):
+                    os.mkdir(parent, 0744)
+                else:
+                    report_error("grand parent (" + grand_parent + ") of " + parent + " does not exist.")
             else:
-                report_error("grand parent of " + parent + " does not exist.")
+                os.mkdir(parent, 0744)
         if not os.path.isdir(parent):
             report_error("parent: " + parent + " does not exist.")
     else:
         raise Exception("Unexpected None parent")
 
 
-def name_cleaner(root, name):
+def name_cleaner(root, name): 
     """Creates a useable path from a root and suggested name.
 
     The name if first cleaned to removed special characters.
@@ -188,7 +191,7 @@ class DirectoryLister(FileSizeChecker):
                 raise Exception("if check_path is specified a list_path is required")
             else:
                 if self.list_path.startswith("~"):
-                    raise Exception("Do not use ~ in list_path")
+                    raise Exception("Do not use ~ in list_path, as it does not work in all cases with all applications.")
         else:
             if self.list_path:
                 raise Exception("if list_path is specified a check_path is required")
@@ -211,8 +214,8 @@ class DirectoryLister(FileSizeChecker):
             required_path = os.path.join(path, required_file)
             if not os.path.exists(required_path):
                 # Ignore directory but check its children!
-                #if verbose:
-                #    print "ignoring", path, "as it is missing", required_file
+                if verbose:
+                    print "ignoring", path, "as it is missing", required_file
                 return True
             else:
                 if (self.size_wrong(required_path)):
@@ -231,9 +234,9 @@ class DirectoryLister(FileSizeChecker):
         return True
 
 
-class Copier:
+class Copier(FileSizeChecker):
     """Copies the files into seperate directories"""
-    def __init__(self, endings_mappings, target_parent=os.getcwd()): 
+    def __init__(self, endings_mappings, target_parent=os.getcwd(), maximum_size=None, minimum_size=None): 
         """Copies the files macthing endings_mappings into target_parent
 
         endings_mappings is a dictionary of regex terms to file endings
@@ -242,6 +245,7 @@ class Copier:
 
         The program exits on an attempt to overwrite with a different file
         """
+        FileSizeChecker.__init__(self, maximum_size, minimum_size)
         self.target_parent = expanderuser(target_parent)
         check_parent(self.target_parent)
         self.endings_mappings = {}
@@ -273,14 +277,18 @@ class Copier:
                     prefix = prefix[: -1]
                 if len(prefix) == 0:
                     report_error("Ending regex: " + pattern.pattern + " was found at start of " + name )
+                oldpath = os.path.join(root, name)
+                if (self.size_wrong(oldpath)):
+                    # Ignore directory but check its children!
+                    if verbose:
+                        print "ignoring", oldpath, "as it is the wrong size"
+                    return False                
                 newdir = os.path.join(self.target_parent, prefix)
                 if not os.path.isdir(newdir):
                     os.mkdir(newdir)
-                oldpath = os.path.join(root, name)
                 newpath = os.path.join(newdir, file_name)
-                return self.__act_on_files__(oldpath, newpath, verbose)
-        print "no match found for", name
-
+                return self.__act_on_files__(oldpath, newpath, verbose)     
+        return False
 
 class Linker(Copier):
     """Links the files into a file in a seperate directory"""
@@ -430,7 +438,7 @@ class ByPrefixCombiner(File_action):
                 if verbose:
                     print path, "contained", count, "lines with", self.divider
 
-class Merger:
+class Merger(FileSizeChecker):
     """Merges selected files into a single directory
 
     Looks for files whose name is one of the keys in file_mappings
@@ -438,8 +446,9 @@ class Merger:
     of the directory name and value in file_mappings
     """
 
-    def __init__(self, file_mappings, target_parent=os.getcwd()):
+    def __init__(self, file_mappings, target_parent=os.getcwd(), maximum_size=None, minimum_size=None):
         """Saves the parameters of a filE_mapping dictionary and target"""
+        FileSizeChecker.__init__(self, maximum_size, minimum_size)
         self.target_parent = expanderuser(target_parent)
         check_parent(self.target_parent)
         self.file_mappings = file_mappings
@@ -454,11 +463,14 @@ class Merger:
         """Copies the file to the target_parent"""
         if name in self.file_mappings:
             old_path = os.path.join(root, name)
+            if (self.size_wrong(old_path)):
+                # Ignore directory but check its children!
+                if verbose:
+                    print "ignoring", old_path, "as it is the wrong size"
+                return False                
             new_name = os.path.basename(root) + self.file_mappings[name]
             new_path = os.path.join(self.target_parent, new_name)
             copy_if_new(old_path, new_path, verbose=verbose)
-        else:
-            print name, self.file_mappings
 
 
 def do_walk(source=os.getcwd(), directory_action=approve_all, file_action=print_size, onerror=None, followlinks=False, verbose=True):
@@ -592,9 +604,10 @@ if __name__ == '__main__':
 
     find_group = optparse.OptionGroup(parser, __FIND__,
                     "Searchs though the " + __SOURCE__ + " directory(and subdirectories) "
-                    "looking for file that match the pattern in " + __FILE_LIST__ + "(s)."
-                    "For each directory with one or more files found.  "
-                    "A subdirectory of " + __PARENT__ + " is created/used "
+                    "looking for file that match the regex pattern in " + __FILE_LIST__ + "(s)."
+                    "For file that matches the regex pattern, the part before the pattern is used as the name of "
+                    "a subdirectory of " + __PARENT__ + " to be created/used. "
+                    "Anything after the pattern is ignored. "
                     "A new file is created with either a link or copy. "
                     'Example: find --file_list="R1_001.fastq.gz:left.link" --file_list="R2_001.fastq.gz:right.link" '
                     )
@@ -608,10 +621,10 @@ if __name__ == '__main__':
                   "Default is the current directory")
     parent_option = find_group.get_option(longer(__PARENT__))
     find_group.add_option(short(__FILE_LIST__), longer(__FILE_LIST__) , dest=__FILE_LIST__ , action="append", type="string",
-                  help="Regex to find file and name to give the new file. "
-                       "Format must be regex:name if find specified. "
-                       "Format must be ending:name if merge is specified. "
-                       "Format can just name if find not specified"
+                  help="List of files to operate over. "
+                       "If find specified, format must be regex:name "
+                       "If merge is specified, format must be ending:name  "
+                       "Format can just name neither find nor merge specified. "
                        "Multiple values allowed.")
     file_list_option = find_group.get_option(longer(__FILE_LIST__ ))
     find_group.add_option(short(__MINIMUM_SIZE__), longer(__MINIMUM_SIZE__) , dest=__MINIMUM_SIZE__ , action="store", type="long",
@@ -640,12 +653,7 @@ if __name__ == '__main__':
     list_group.add_option(short(__LISTp__), longer(__LISTp__), dest=__LISTp__, action="store", type="string",
                   default="directories.txt",
                   help="File to hold the list of directories. "
-                  "Default is directories.txt "
-                  "If " + __LISTp__ + " is a relative path it is relative to " + __OUTPUT_DIR__ )
-    list_group.add_option(short(__OUTPUT_DIR__), longer(__OUTPUT_DIR__), dest=__OUTPUT_DIR__, action="store", type="string",
-                  help="Directories to hold the file(s). "
-                  "Default is " + __PARENT__)
-    output_option = find_group.get_option(longer(__OUTPUT_DIR__))
+                  "Default is directories.txt in the current directory.")
     list_option = list_group.get_option(longer(__LISTp__))
     parser.add_option_group(list_group)
 
@@ -671,16 +679,16 @@ if __name__ == '__main__':
                      "Placed in the " + __OUTPUT_DIR__ )
     extract_group.option_list.append(parent_option)
     extract_group.option_list.append(file_list_option)
-    extract_group.option_list.append(minimum_size_option)
-    extract_group.option_list.append(maximum_size_option)
     extract_group.add_option(short(__EXTRACT_PREFIX__), longer(__EXTRACT_PREFIX__), dest=__EXTRACT_PREFIX__,
                   action="append", type="string",
                   help="Prefix of the line to extract information from.")
-    extract_group.option_list.append(output_option)
-    outout_option = find_group.get_option(longer(__OUTPUT_DIR__))
+    extract_group.add_option(short(__OUTPUT_DIR__), longer(__OUTPUT_DIR__), dest=__OUTPUT_DIR__, action="store", type="string",
+                  help="Directories to hold the file(s). "
+                  "Default is " + __PARENT__)
+    output_option = extract_group.get_option(longer(__OUTPUT_DIR__))
     parser.add_option_group(extract_group)
 
-    batch_group = optparse.OptionGroup(parser, __DELIMIT__,
+    delimit_group = optparse.OptionGroup(parser, __DELIMIT__,
                      "Extract information from the files in the " + __PARENT__ + " directory "
                      "(and sub directories) "
                      "whose name are in the " + __FILE_LIST__ + "(s) "
@@ -688,29 +696,27 @@ if __name__ == '__main__':
                      "Saving what comes after the " + __DELIMITER__ + " +  in a file whose "
                      "name is based on what comes before the delimieter"
                      "Placed in the " + __OUTPUT_DIR__ )
-    batch_group.option_list.append(parent_option)
-    batch_group.option_list.append(file_list_option)
-    batch_group.option_list.append(minimum_size_option)
-    batch_group.option_list.append(maximum_size_option)
-    batch_group.add_option(short(__DELIMITER__), longer(__DELIMITER__), dest=__DELIMITER__, action="store", type="string",
+    delimit_group.option_list.append(parent_option)
+    delimit_group.option_list.append(file_list_option)
+    delimit_group.add_option(short(__DELIMITER__), longer(__DELIMITER__), dest=__DELIMITER__, action="store", type="string",
                   help="Delimiter to create extract information files with."
                        "Will look in all files in the directories specified by parent that are in the file_list."
                        "For each line with this delimiter it will not the rest in a summary file."
                        "This data will be written to a tsv file in the parent directory.")
-    batch_group.option_list.append(outout_option)
-    parser.add_option_group(batch_group)
+    delimit_group.option_list.append(output_option)
+    parser.add_option_group(delimit_group)
 
     merge_group = optparse.OptionGroup(parser, __MERGE__,
                      "Merges files found in the " + __PARENT__ + " directory (and sub directories) "
                      "whose name are in the name part of " + __FILE_LIST__ + "(s) "
                      "Coping these with a file whose name is based on the directory "
-                     "and the ending spart of " + __FILE_LIST__ + "(s) "
+                     "and the ending part of " + __FILE_LIST__ + "(s) "
                      "Placed in the " + __OUTPUT_DIR__ )
     merge_group.option_list.append(parent_option)
     merge_group.option_list.append(file_list_option)
     merge_group.option_list.append(minimum_size_option)
     merge_group.option_list.append(maximum_size_option)
-    merge_group.option_list.append(outout_option)
+    merge_group.option_list.append(output_option)
     parser.add_option_group(merge_group)
 
     (options, args) = parser.parse_args()
@@ -761,17 +767,17 @@ if __name__ == '__main__':
         options.__dict__[__OUTPUT_DIR__] = options.__dict__[__PARENT__]
 
     options.__dict__[__LISTp__] = expanderuser(options.__dict__[__LISTp__])
-    if not os.path.isabs(options.__dict__[__LISTp__]):
-        options.__dict__[__LISTp__] = os.path.join(options.__dict__[__OUTPUT_DIR__], options.__dict__[__LISTp__])
 
     if __FIND__ in args:
         # parent, source and copy have default values
         # File list already checked
         if options.__dict__[__COPY__]:
-            copier = Copier(endings_mappings, options.__dict__[__PARENT__])
+            copier = Copier(endings_mappings, options.__dict__[__PARENT__],
+                            minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__])
             print "Coping files from", options.__dict__[__SOURCE__], "to", options.__dict__[__PARENT__]
         else:
-            copier = Linker(endings_mappings, options.__dict__[__PARENT__])
+            copier = Linker(endings_mappings, options.__dict__[__PARENT__],
+                            minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__])
             print "linking files from", options.__dict__[__SOURCE__], "in", options.__dict__[__PARENT__]
         print "Using the file mappings: "
         print endings_mappings
@@ -801,8 +807,8 @@ if __name__ == '__main__':
             batch = options.__dict__[__BATCH_SCRIPT__]
         else:
             batch = options.__dict__[__QSUB_SCRIPT__] + "_batch"
-        print "Writing new batch script to", batch
-        print "Based on squb_script", options.__dict__[__QSUB_SCRIPT__]
+        print "Writing new",__BATCH_SCRIPT__,"to", batch
+        print "Based on", __QSUB_SCRIPT__, options.__dict__[__QSUB_SCRIPT__]
         print "Using directory LIST", options.__dict__[__LISTp__]
         update_script(options.__dict__[__QSUB_SCRIPT__], batch, options.__dict__[__LISTp__])
         if options.__dict__[__VERBOSE__]:
@@ -839,8 +845,9 @@ if __name__ == '__main__':
             print
 
     if __MERGE__ in args:
-        print "Writing extract to ", options.__dict__[__OUTPUT_DIR__]
-        merger = Merger(file_mappings, options.__dict__[__OUTPUT_DIR__])
+        print "Coping files to ", options.__dict__[__OUTPUT_DIR__]
+        merger = Merger(file_mappings, options.__dict__[__OUTPUT_DIR__], 
+                        minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__])
         do_walk(source=options.__dict__[__PARENT__], directory_action=approve_all,
                 file_action=merger.copy_files, verbose=options.__dict__[__VERBOSE__])
         if options.__dict__[__VERBOSE__]:

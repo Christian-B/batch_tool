@@ -7,10 +7,11 @@ Options:
 
   find:
     Searchs though the SOURCE directory(and subdirectories) looking for
-    file that match the pattern in FILE_LIST(s).For each directory with
-    one or more files found.  A subdirectory of PARENT is created/used A
-    new file is created with either a link or copy. Example: find
-    --file_list="R1_001.fastq.gz:left.link"
+    file that match the regex pattern in FILE_LIST(s).For file that
+    matches the regex pattern, the part before the pattern is used as the
+    name of a subdirectory of PARENT to be created/used. Anything after
+    the pattern is ignored. A new file is created with either a link or
+    copy. Example: find --file_list="R1_001.fastq.gz:left.link"
     --file_list="R2_001.fastq.gz:right.link"
 
     -s SOURCE, --source=SOURCE
@@ -20,10 +21,10 @@ Options:
                         PARENT directory of the sub directories to hold the
                         data for each run Default is the current directory
     -f FILE_LIST, --file_list=FILE_LIST
-                        Regex to find file and name to give the new file.
-                        Format must be regex:name if find specified. Format
-                        must be ending:name if merge is specified. Format can
-                        just name if find not specifiedMultiple values
+                        List of files to operate over. If find specified,
+                        format must be regex:name If merge is specified,
+                        format must be ending:name  Format can just name
+                        neither find nor merge specified. Multiple values
                         allowed.
     -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
                         Minimum size in bytes that a file must have to be
@@ -45,10 +46,10 @@ Options:
                         PARENT directory of the sub directories to hold the
                         data for each run Default is the current directory
     -f FILE_LIST, --file_list=FILE_LIST
-                        Regex to find file and name to give the new file.
-                        Format must be regex:name if find specified. Format
-                        must be ending:name if merge is specified. Format can
-                        just name if find not specifiedMultiple values
+                        List of files to operate over. If find specified,
+                        format must be regex:name If merge is specified,
+                        format must be ending:name  Format can just name
+                        neither find nor merge specified. Multiple values
                         allowed.
     -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
                         Minimum size in bytes that a file must have to be
@@ -58,10 +59,7 @@ Options:
                         used.
     -l LIST, --list=LIST
                         File to hold the list of directories. Default is
-                        directories.txt If LIST is a relative path it is
-                        relative to OUTPUT_DIR
-    -o OUTPUT_DIR, --output_dir=OUTPUT_DIR
-                        Directories to hold the file(s). Default is PARENT
+                        directories.txt in the current directory.
 
   batch:
     Converts the QSUB_SCRIPT to a batch/job array The batch will run over
@@ -69,8 +67,7 @@ Options:
 
     -l LIST, --list=LIST
                         File to hold the list of directories. Default is
-                        directories.txt If LIST is a relative path it is
-                        relative to OUTPUT_DIR
+                        directories.txt in the current directory.
     -q QSUB_SCRIPT, --qsub_script=QSUB_SCRIPT
                         qsub script to be switched to batch. This script
                         should have a line which starts with DIRECTORY= This
@@ -90,17 +87,11 @@ Options:
                         PARENT directory of the sub directories to hold the
                         data for each run Default is the current directory
     -f FILE_LIST, --file_list=FILE_LIST
-                        Regex to find file and name to give the new file.
-                        Format must be regex:name if find specified. Format
-                        must be ending:name if merge is specified. Format can
-                        just name if find not specifiedMultiple values
+                        List of files to operate over. If find specified,
+                        format must be regex:name If merge is specified,
+                        format must be ending:name  Format can just name
+                        neither find nor merge specified. Multiple values
                         allowed.
-    -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
-                        Minimum size in bytes that a file must have to be
-                        used.
-    -X MAXIMUM_SIZE, --maximum_size=MAXIMUM_SIZE
-                        Maximum size in bytes that a file must have to be
-                        used.
     -e EXTRACT_PREFIX, --extract_prefix=EXTRACT_PREFIX
                         Prefix of the line to extract information from.
     -o OUTPUT_DIR, --output_dir=OUTPUT_DIR
@@ -117,17 +108,11 @@ Options:
                         PARENT directory of the sub directories to hold the
                         data for each run Default is the current directory
     -f FILE_LIST, --file_list=FILE_LIST
-                        Regex to find file and name to give the new file.
-                        Format must be regex:name if find specified. Format
-                        must be ending:name if merge is specified. Format can
-                        just name if find not specifiedMultiple values
+                        List of files to operate over. If find specified,
+                        format must be regex:name If merge is specified,
+                        format must be ending:name  Format can just name
+                        neither find nor merge specified. Multiple values
                         allowed.
-    -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
-                        Minimum size in bytes that a file must have to be
-                        used.
-    -X MAXIMUM_SIZE, --maximum_size=MAXIMUM_SIZE
-                        Maximum size in bytes that a file must have to be
-                        used.
     -d DELIMITER, --delimiter=DELIMITER
                         Delimiter to create extract information files
                         with.Will look in all files in the directories
@@ -141,17 +126,17 @@ Options:
   merge:
     Merges files found in the PARENT directory (and sub directories) whose
     name are in the name part of FILE_LIST(s) Coping these with a file
-    whose name is based on the directory and the ending spart of
+    whose name is based on the directory and the ending part of
     FILE_LIST(s) Placed in the OUTPUT_DIR
 
     -p PARENT, --parent=PARENT
                         PARENT directory of the sub directories to hold the
                         data for each run Default is the current directory
     -f FILE_LIST, --file_list=FILE_LIST
-                        Regex to find file and name to give the new file.
-                        Format must be regex:name if find specified. Format
-                        must be ending:name if merge is specified. Format can
-                        just name if find not specifiedMultiple values
+                        List of files to operate over. If find specified,
+                        format must be regex:name If merge is specified,
+                        format must be ending:name  Format can just name
+                        neither find nor merge specified. Multiple values
                         allowed.
     -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
                         Minimum size in bytes that a file must have to be
