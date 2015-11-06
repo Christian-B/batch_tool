@@ -1,0 +1,163 @@
+Usage: batch_tools.py command(s) [options] 
+Where command(s) is one or more of ['find', 'list', 'batch', 'extract', 'delimit', 'merge']
+
+Options:
+  -h, --help            show this help message and exit
+  -v, --verbose         If set will generate output of what the tool is doing.
+
+  find:
+    Searchs though the SOURCE directory(and subdirectories) looking for
+    file that match the pattern in FILE_LIST(s).For each directory with
+    one or more files found.  A subdirectory of PARENT is created/used A
+    new file is created with either a link or copy. Example: find
+    --file_list="R1_001.fastq.gz:left.link"
+    --file_list="R2_001.fastq.gz:right.link"
+
+    -s SOURCE, --source=SOURCE
+                        SOURCEdirectory that holds the raw data files. Default
+                        is the current directory
+    -p PARENT, --parent=PARENT
+                        PARENT directory of the sub directories to hold the
+                        data for each run Default is the current directory
+    -f FILE_LIST, --file_list=FILE_LIST
+                        Regex to find file and name to give the new file.
+                        Format must be regex:name if find specified. Format
+                        must be ending:name if merge is specified. Format can
+                        just name if find not specifiedMultiple values
+                        allowed.
+    -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
+                        Minimum size in bytes that a file must have to be
+                        used.
+    -X MAXIMUM_SIZE, --maximum_size=MAXIMUM_SIZE
+                        Maximum size in bytes that a file must have to be
+                        used.
+    -c, --copy          (Optional) If specified will copy the original file to
+                        the new location. Otherwise just the path to the
+                        original file is saved.
+
+  list:
+    Lists all the paths to the directories (including subdirectories) in
+    PARENT directoryBut only includes the directories that contain a
+    files in FILE_LIST(s)This list is writen to the path specified as LIST
+    Example: list --file_list="left.link" --file_list="right.link"
+
+    -p PARENT, --parent=PARENT
+                        PARENT directory of the sub directories to hold the
+                        data for each run Default is the current directory
+    -f FILE_LIST, --file_list=FILE_LIST
+                        Regex to find file and name to give the new file.
+                        Format must be regex:name if find specified. Format
+                        must be ending:name if merge is specified. Format can
+                        just name if find not specifiedMultiple values
+                        allowed.
+    -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
+                        Minimum size in bytes that a file must have to be
+                        used.
+    -X MAXIMUM_SIZE, --maximum_size=MAXIMUM_SIZE
+                        Maximum size in bytes that a file must have to be
+                        used.
+    -l LIST, --list=LIST
+                        File to hold the list of directories. Default is
+                        directories.txt If LIST is a relative path it is
+                        relative to OUTPUT_DIR
+    -o OUTPUT_DIR, --output_dir=OUTPUT_DIR
+                        Directories to hold the file(s). Default is PARENT
+
+  batch:
+    Converts the QSUB_SCRIPT to a batch/job array The batch will run over
+    each directory in the LIST
+
+    -l LIST, --list=LIST
+                        File to hold the list of directories. Default is
+                        directories.txt If LIST is a relative path it is
+                        relative to OUTPUT_DIR
+    -q QSUB_SCRIPT, --qsub_script=QSUB_SCRIPT
+                        qsub script to be switched to batch. This script
+                        should have a line which starts with DIRECTORY= This
+                        line will be replaced with a loop for each directory
+                        in the LIST
+    -b BATCH_SCRIPT, --batch_script=BATCH_SCRIPT
+                        Location to write batch qsub script to. Default is
+                        QSUB_SCRIPT + "_batch"
+
+  extract:
+    Extract information from the files in PARENT directory (and sub
+    directories) whose name are in the FILE_LIST(s)Looking for a line that
+    begins with the EXTRACT_PREFIX These will be written to a file called
+    EXTRACT_PREFIX.tsv Placed in the OUTPUT_DIR
+
+    -p PARENT, --parent=PARENT
+                        PARENT directory of the sub directories to hold the
+                        data for each run Default is the current directory
+    -f FILE_LIST, --file_list=FILE_LIST
+                        Regex to find file and name to give the new file.
+                        Format must be regex:name if find specified. Format
+                        must be ending:name if merge is specified. Format can
+                        just name if find not specifiedMultiple values
+                        allowed.
+    -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
+                        Minimum size in bytes that a file must have to be
+                        used.
+    -X MAXIMUM_SIZE, --maximum_size=MAXIMUM_SIZE
+                        Maximum size in bytes that a file must have to be
+                        used.
+    -e EXTRACT_PREFIX, --extract_prefix=EXTRACT_PREFIX
+                        Prefix of the line to extract information from.
+    -o OUTPUT_DIR, --output_dir=OUTPUT_DIR
+                        Directories to hold the file(s). Default is PARENT
+
+  delimit:
+    Extract information from the files in the PARENT directory (and sub
+    directories) whose name are in the FILE_LIST(s) Looking for lines with
+    the delimiter in them.Saving what comes after the DELIMITER +  in a
+    file whose name is based on what comes before the delimieterPlaced in
+    the OUTPUT_DIR
+
+    -p PARENT, --parent=PARENT
+                        PARENT directory of the sub directories to hold the
+                        data for each run Default is the current directory
+    -f FILE_LIST, --file_list=FILE_LIST
+                        Regex to find file and name to give the new file.
+                        Format must be regex:name if find specified. Format
+                        must be ending:name if merge is specified. Format can
+                        just name if find not specifiedMultiple values
+                        allowed.
+    -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
+                        Minimum size in bytes that a file must have to be
+                        used.
+    -X MAXIMUM_SIZE, --maximum_size=MAXIMUM_SIZE
+                        Maximum size in bytes that a file must have to be
+                        used.
+    -d DELIMITER, --delimiter=DELIMITER
+                        Delimiter to create extract information files
+                        with.Will look in all files in the directories
+                        specified by parent that are in the file_list.For each
+                        line with this delimiter it will not the rest in a
+                        summary file.This data will be written to a tsv file
+                        in the parent directory.
+    -o OUTPUT_DIR, --output_dir=OUTPUT_DIR
+                        Directories to hold the file(s). Default is PARENT
+
+  merge:
+    Merges files found in the PARENT directory (and sub directories) whose
+    name are in the name part of FILE_LIST(s) Coping these with a file
+    whose name is based on the directory and the ending spart of
+    FILE_LIST(s) Placed in the OUTPUT_DIR
+
+    -p PARENT, --parent=PARENT
+                        PARENT directory of the sub directories to hold the
+                        data for each run Default is the current directory
+    -f FILE_LIST, --file_list=FILE_LIST
+                        Regex to find file and name to give the new file.
+                        Format must be regex:name if find specified. Format
+                        must be ending:name if merge is specified. Format can
+                        just name if find not specifiedMultiple values
+                        allowed.
+    -m MINIMUM_SIZE, --minimum_size=MINIMUM_SIZE
+                        Minimum size in bytes that a file must have to be
+                        used.
+    -X MAXIMUM_SIZE, --maximum_size=MAXIMUM_SIZE
+                        Maximum size in bytes that a file must have to be
+                        used.
+    -o OUTPUT_DIR, --output_dir=OUTPUT_DIR
+                        Directories to hold the file(s). Default is PARENT
