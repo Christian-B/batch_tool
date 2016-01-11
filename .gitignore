@@ -1,8 +1,11 @@
-#Backu Files
+#Backup Files
 *~
 
 #output folder used in examples
 output/
+
+#filtered output
+*filtered_log.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
