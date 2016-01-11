@@ -558,9 +558,9 @@ class Filter(FileSizeChecker):
         return False
 
     def __copy_and_filter__(self, old_path, new_path, verbose=True):
-        #if os.path.exists(new_path):
-        #    report_error("Unwilling to overwrite: " + new_path + " with " + old_path)
-        #else:
+        if os.path.exists(new_path):
+            report_error("Unwilling to overwrite: " + new_path + " with " + old_path)
+        else:
             with open(old_path, 'r') as old_f:
                 with open(new_path, 'w') as new_f:
                     for line in old_f:
