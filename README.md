@@ -157,5 +157,25 @@ The preprocessing list could also be used for postprocessing, for example to fin
 This list could then be used for manual checking or even rerunning just the failed jobs. 
 
 
+## Filter
+Walks through the directory making copies of some files but filtering out unwanted parts
+
+For each file found a copy is created in the same directory with the regex part of the name replaced by the replacement
+
+However only lines that match one of the keep_regex patterns are copied.
+And even from these any parts that matches any --remove_regex are removed.
+
+### file_list
+The file_list parameter must be in two parts. (Seperated by a :)
+1. The regex to identify the file(s) to copy
+2. The replacement to swap for the part matched by the regex
+
+### Examples
+```
+rm sample_data/logs/*filtered_log.txt
+
+python batch_tools.py filter --source=sample_data/logs  --file_list=R1_logfile.txt$:filtered_log.txt --keep_regex ERCC-000 --remove_regex \\[.*\\] --verbose 
+```
+
 
 
