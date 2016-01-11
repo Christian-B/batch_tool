@@ -11,9 +11,9 @@ parser = None
 
 def report_error(error):
     """Prints the error, usage (if possible) and exits -1"""
-    print error
+    #print error
     if parser:
-        parser.print_help()
+        # parser.print_help()
         print
         print error
     sys.exit(1)
@@ -78,6 +78,39 @@ def copy_if_new(old_path, new_path, verbose=True):
         shutil.copy2(old_path, new_path)
         if verbose:
             print new_path, "created"
+
+
+def remove_symbols(s):
+    if s.find("__") == -1:
+        return s
+    #Patterns used by Galaxy    
+    s = s.replace("__cb__", ']')
+    s = s.replace("__cc__", '}')
+    s = s.replace("__dq__", '"')
+    s = s.replace("__lt__", '<')
+    s = s.replace("__gt__", '>')
+    s = s.replace("__ob__", '[')
+    s = s.replace("__oc__", '{')
+    s = s.replace("__sq__", "'")
+    # Patterns added by Christian
+    s = s.replace("__in__",'%in%')
+    s = s.replace("__not__",'!')
+    end = -2
+    while True:
+        start = s.find("__", end+2) + 2
+        if start == 1:
+            return s
+        end = s.find("__", start)
+        if end == -1:
+            return s
+        part = s[start: end]
+        try:
+            ascii = int(part)
+            s = s.replace("__" + part + "__",chr(ascii))
+            end= -2
+        except ValueError as e:
+            pass
+    return s
 
 
 """
@@ -472,6 +505,92 @@ class Merger(FileSizeChecker):
             new_path = os.path.join(self.target_parent, new_name)
             copy_if_new(old_path, new_path, verbose=verbose)
 
+class Filter(FileSizeChecker):
+    """Copies the files into seperate directories"""
+    def __init__(self, filter_mappings, keep_regexes, remove_regexes=list(), maximum_size=None, minimum_size=None, verbose=True): 
+        """Copies the files matching endings_mappings based on keep_regexes and remove_regexs
+
+        replace_mapping is a dictionary of regex terms to replacements
+        Every time a file is found with matches the key a new file is
+        created with the regex matched part of the name replaced by the value
+        
+        Only lines that contain at least one of the keep patterns are copied.
+        From these any part that matches any remove regex is replace by an empty string
+
+        The program exits on an attempt to overwrite with a different file
+        """
+        FileSizeChecker.__init__(self, maximum_size, minimum_size)
+        self.filter_mappings = {}
+        try:
+            if len(filter_mappings) == 0:
+                raise Exception("filter_mappings may not be empty")
+        except Exception as e:
+            print e
+            raise Exception("filter_mappings must be a dictionary")
+        for(regex, replace) in filter_mappings.items():
+            pattern = re.compile(regex)
+            self.filter_mappings[pattern] = replace
+
+        self.keep_patterns = list()
+        try:
+            if len(keep_regexes) == 0:
+                raise Exception("keep_regexes may not be empty")
+        except Exception as e:
+            print e
+            raise Exception("keep_regexes must be a list")
+        for regex in keep_regexes:
+            if verbose:
+                print "Will keep any line that has: ", regex
+            pattern = re.compile(remove_symbols(regex))
+            self.keep_patterns.append(pattern)
+        self.remove_patterns = list()
+        for regex in remove_regexes:
+            if verbose:
+                print "Will remove any text that matches: ", regex
+            pattern = re.compile(remove_symbols(regex))
+            self.remove_patterns.append(pattern)
+
+    def __keep_line__(self, line):
+        for pattern in self.keep_patterns:
+            match = pattern.search(line)
+            if match:
+                return True
+        return False
+
+    def __copy_and_filter__(self, old_path, new_path, verbose=True):
+        #if os.path.exists(new_path):
+        #    report_error("Unwilling to overwrite: " + new_path + " with " + old_path)
+        #else:
+            with open(old_path, 'r') as old_f:
+                with open(new_path, 'w') as new_f:
+                    for line in old_f:
+                        if self.__keep_line__(line):
+                            line = line
+                            for remove_pattern in self.remove_patterns:
+                                #print remove_pattern.pattern
+                                line = remove_pattern.sub("", line)
+                                #print line
+                            line = line.strip()
+                            new_f.write(line)
+                            new_f.write("\n")
+
+    def file_action(self, root, name, verbose=True):
+        """Checks if name matches any regex pattern and if so copies the file
+
+        """
+        for(pattern, replace) in self.filter_mappings.items():
+            match = pattern.search(name)
+            if match:
+                oldpath = os.path.join(root, name)
+                if (self.size_wrong(oldpath)):
+                    # Ignore directory but check its children!
+                    if verbose:
+                        print "ignoring", oldpath, "as it is the wrong size"
+                    return False                
+                newname = re.sub(pattern.pattern, replace, name)
+                newpath = os.path.join(root, newname)
+                return self.__copy_and_filter__(oldpath, newpath, verbose)     
+        return False
 
 def do_walk(source=os.getcwd(), directory_action=approve_all, file_action=print_size, onerror=None, followlinks=False, verbose=True):
     """
@@ -571,7 +690,8 @@ __BATCH__ = "batch"
 __EXTRACT__ = "extract"
 __DELIMIT__ = "delimit"
 __MERGE__ = "merge"
-__COMMANDS__ = [__FIND__, __LIST__, __BATCH__, __EXTRACT__, __DELIMIT__, __MERGE__]
+__FILTER__ = "filter"
+__COMMANDS__ = [__FIND__, __LIST__, __BATCH__, __EXTRACT__, __DELIMIT__, __MERGE__, __FILTER__]
 
 """Parameter names"""
 #__AFTER_DATE__ = "AFTER_DATE"
@@ -581,11 +701,13 @@ __DELIMITER__ = "DELIMITER"
 __EXTRACT_PREFIX__ = "EXTRACT_PREFIX"
 __FILE_LIST__ = "FILE_LIST"
 __LISTp__ = "LIST"
+__KEEP_REGEX__ = "KEEP_REGEX"
 __MINIMUM_SIZE__ = "MINIMUM_SIZE"
 __MAXIMUM_SIZE__ = "MAXIMUM_SIZE"  #short = x
 __OUTPUT_DIR__ = "OUTPUT_DIR"
 __PARENT__ = "PARENT"
 __QSUB_SCRIPT__ = "QSUB_SCRIPT"
+__REMOVE_REGEX__ = "REMOVE_REGEX"
 __SOURCE__ = "SOURCE"
 #__UPTO_DATE__ = "UPTO_DATE"
 __VERBOSE__ = "VERBOSE"
@@ -622,9 +744,10 @@ if __name__ == '__main__':
     parent_option = find_group.get_option(longer(__PARENT__))
     find_group.add_option(short(__FILE_LIST__), longer(__FILE_LIST__) , dest=__FILE_LIST__ , action="append", type="string",
                   help="List of files to operate over. "
-                       "If find specified, format must be regex:name "
-                       "If merge is specified, format must be ending:name  "
-                       "Format can just name neither find nor merge specified. "
+                       "If " + __FIND__ + " specified, format must be regex:name "
+                       "If " + __MERGE__ + " is specified, format must be ending:name  "
+                       "If " + __FILTER__ + " is specified, format must be regex:replacement  "
+                       "Otherwise format can be just the name. "
                        "Multiple values allowed.")
     file_list_option = find_group.get_option(longer(__FILE_LIST__ ))
     find_group.add_option(short(__MINIMUM_SIZE__), longer(__MINIMUM_SIZE__) , dest=__MINIMUM_SIZE__ , action="store", type="long",
@@ -714,11 +837,26 @@ if __name__ == '__main__':
                      "Placed in the " + __OUTPUT_DIR__ )
     merge_group.option_list.append(parent_option)
     merge_group.option_list.append(file_list_option)
-    merge_group.option_list.append(minimum_size_option)
-    merge_group.option_list.append(maximum_size_option)
     merge_group.option_list.append(output_option)
     parser.add_option_group(merge_group)
 
+    filter_group = optparse.OptionGroup(parser, __FILTER__,
+                     "Filters files found in the " + __PARENT__ + " directory (and sub directories) "
+                     "whose name match the regex part of " + __FILE_LIST__ + "(s) "
+                     "Coping these with a file whose name is the regex part replaced with the replacement part of " + __FILE_LIST__ + ". "
+                     "Placed in the " + __OUTPUT_DIR__ )
+    filter_group.option_list.append(parent_option)
+    filter_group.option_list.append(file_list_option)
+    filter_group.add_option(short(__KEEP_REGEX__), longer(__KEEP_REGEX__), dest=__KEEP_REGEX__, action="append", type="string",
+                  help="Regex pattern to idenfity a line that should be kept. "
+                       "Multiple values are allowed in which case any line which has any of the values is kept.")
+    filter_group.add_option(short(__REMOVE_REGEX__), longer(__REMOVE_REGEX__), dest=__REMOVE_REGEX__, action="append", type="string",
+                  help="Regex pattern to idenfity parts of the lines to remove. "
+                       "Multiple values are allowed in which they are applied in the order provided." 
+                       "The same pattern can be used for both a " + __KEEP_REGEX__ + " and a " + __REMOVE_REGEX__ + ". ")
+    filter_group.option_list.append(output_option)
+    parser.add_option_group(filter_group)
+    
     (options, args) = parser.parse_args()
 
     if len(args) == 0:
@@ -734,6 +872,9 @@ if __name__ == '__main__':
         if __MERGE__ in args:
             report_error(__FIND__ + " and " + __MERGE__ +
                          " can not be combined due to different " + __FILE_LIST__ + " formats")
+        if __FILTER__ in args:
+            report_error(__FIND__ + " and " + __FILTER__ +
+                         " can not be combined due to different " + __FILE_LIST__ + " formats")
         if not options.__dict__[__FILE_LIST__]:
             report_error(__FIND__ + " selected but no " + __FILE_LIST__ + " parameter provided")
         endings_mappings = {}
@@ -744,6 +885,9 @@ if __name__ == '__main__':
             endings_mappings[parts[0]] = parts[1]
         required_files = endings_mappings.values()
     elif __MERGE__ in args:
+        if __FILTER__ in args:
+            report_error(__MERGE__ + " and " + __FILTER__ +
+                         " can not be combined due to different " + __FILE_LIST__ + " formats")
         if not options.__dict__[__FILE_LIST__]:
             report_error(__MERGE__ + " selected but no " + __FILE_LIST__ + " parameter provided")
         file_mappings = {}
@@ -752,6 +896,15 @@ if __name__ == '__main__':
             if len(parts) != 2:
                 report_error(__FILE_LIST__ + " " + file_option + " not in the expected ending:name format")
             file_mappings[parts[1]] = parts[0]
+    elif __FILTER__ in args:
+        if not options.__dict__[__FILE_LIST__]:
+            report_error(__MERGE__ + " selected but no " + __FILE_LIST__ + " parameter provided")
+        filter_mappings = {}
+        for file_option in options.__dict__[__FILE_LIST__]:
+            parts = file_option.split(":")
+            if len(parts) != 2:
+                report_error(__FILE_LIST__ + " " + file_option + " not in the expected ending:name format")
+            filter_mappings[parts[0]] = parts[1]
     elif options.__dict__[__FILE_LIST__]:
         required_files = []
         for file_option in options.__dict__[__FILE_LIST__]:
@@ -850,6 +1003,23 @@ if __name__ == '__main__':
                         minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__])
         do_walk(source=options.__dict__[__PARENT__], directory_action=approve_all,
                 file_action=merger.copy_files, verbose=options.__dict__[__VERBOSE__])
+        if options.__dict__[__VERBOSE__]:
+            print
+
+    if __FILTER__ in args:
+        if not options.__dict__[__PARENT__]:
+            report_error(__FILTER__ + " selected but no " + __PARENT__ + " parameter provided")
+        print "Coping and filtering files to ", options.__dict__[__PARENT__]
+        if not filter_mappings:
+            report_error(__FILTER__ + " selected  but no "+ __FILE_LIST__ + " parameter provided")
+        if not options.__dict__[__KEEP_REGEX__]:
+            report_error(__FILTER__ + " selected but no " + __KEEP_REGEX__ + " parameter provided")
+        if not options.__dict__[__REMOVE_REGEX__]:
+             options.__dict__[__REMOVE_REGEX__] = list()
+        filter = Filter(filter_mappings, options.__dict__[__KEEP_REGEX__], options.__dict__[__REMOVE_REGEX__],  
+                        minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__], verbose=options.__dict__[__VERBOSE__])
+        do_walk(source=options.__dict__[__PARENT__], directory_action=approve_all,
+                file_action=filter.file_action, verbose=options.__dict__[__VERBOSE__])
         if options.__dict__[__VERBOSE__]:
             print
 
