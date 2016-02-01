@@ -22,7 +22,7 @@ def report_error(error):
 def expanderuser(path):
     """Replaces the ~ with the users home directory"""
     if path.startswith("~"):
-        return os.path.expanduser("~") + path[1: ]
+        return os.path.expanduser("~") + path[1:]
     return path
 
 
@@ -31,7 +31,7 @@ def check_parent(parent):
     if parent:
         if not os.path.isdir(parent):
             if os.path.isfile(parent):
-                report_error("parent: " + parent + " is a file.")            
+                report_error("parent: " + parent + " is a file.")
             grand_parent = os.path.dirname(os.path.normpath(parent))
             if (grand_parent):
                 if os.path.isdir(grand_parent):
@@ -46,7 +46,7 @@ def check_parent(parent):
         raise Exception("Unexpected None parent")
 
 
-def name_cleaner(root, name): 
+def name_cleaner(root, name):
     """Creates a useable path from a root and suggested name.
 
     The name if first cleaned to removed special characters.
@@ -57,7 +57,7 @@ def name_cleaner(root, name):
     if name[-1] == "_":
         name = name[: -1]
     if name[0] == "_":
-        name = name[1: ]
+        name = name[1:]
     return os.path.join(root, name)
 
 
@@ -83,7 +83,7 @@ def copy_if_new(old_path, new_path, verbose=True):
 def remove_symbols(s):
     if s.find("__") == -1:
         return s
-    #Patterns used by Galaxy    
+    # Patterns used by Galaxy
     s = s.replace("__cb__", ']')
     s = s.replace("__cc__", '}')
     s = s.replace("__dq__", '"')
@@ -93,11 +93,13 @@ def remove_symbols(s):
     s = s.replace("__oc__", '{')
     s = s.replace("__sq__", "'")
     # Patterns added by Christian
-    s = s.replace("__in__",'%in%')
-    s = s.replace("__not__",'!')
+    s = s.replace("__in__", '%in%')
+    s = s.replace("__not__", '!')
     end = -2
+    # tab = 9
+    # | = 124
     while True:
-        start = s.find("__", end+2) + 2
+        start = s.find("__", end + 2) + 2
         if start == 1:
             return s
         end = s.find("__", start)
@@ -106,9 +108,9 @@ def remove_symbols(s):
         part = s[start: end]
         try:
             ascii = int(part)
-            s = s.replace("__" + part + "__",chr(ascii))
-            end= -2
-        except ValueError as e:
+            s = s.replace("__" + part + "__", chr(ascii))
+            end = -2
+        except ValueError:
             pass
     return s
 
@@ -159,7 +161,7 @@ class RegexChecker:
 
 class FileSizeChecker:
     """Superclass of classes that could check the size of a file"""
-    
+
     def __init__(self, maximum_size=None, minimum_size=None):
         if maximum_size is None:
             if minimum_size is None:
@@ -167,23 +169,23 @@ class FileSizeChecker:
             else:
                 self.minimum_size = minimum_size
                 self.size_wrong = self.too_small
-        else:        
+        else:
             self.maximum_size = maximum_size
             if minimum_size is None:
                 self.size_wrong = self.too_big
             else:
                 self.minimum_size = minimum_size
                 self.size_wrong = self.outside_range
-                
+
     def never_wrong(self, path):
-        return False            
-                
+        return False
+
     def too_small(self, path):
         return os.path.getsize(path) < self.minimum_size
-                 
+
     def too_big(self, path):
         #print path
-        #print os.path.getsize(path) 
+        #print os.path.getsize(path)
         #print os.path.getsize(path) > self.maximum_size
         return os.path.getsize(path) > self.maximum_size
 
@@ -192,6 +194,7 @@ class FileSizeChecker:
         if (size < self.minimum_size):
             return True
         return os.path.getsize(path) > self.maximum_size
+
 
 class DirectoryLister(FileSizeChecker):
     """Creates a list (to file) of the all suitable directories
@@ -255,10 +258,10 @@ class DirectoryLister(FileSizeChecker):
                     # Ignore directory but check its children!
                     if verbose:
                         print "ignoring", path, "as", required_file, "is the wrong size"
-                    return True                
+                    return True
         if self.check_path:
             if path.startswith(self.check_path):
-                path = self.list_path + path[len(self.check_path): ]
+                path = self.list_path + path[len(self.check_path):]
         with open(self.list_file, 'a') as f:
             f.write(path)
             f.write("\n")
@@ -269,7 +272,7 @@ class DirectoryLister(FileSizeChecker):
 
 class Copier(FileSizeChecker):
     """Copies the files into seperate directories"""
-    def __init__(self, endings_mappings, target_parent=os.getcwd(), maximum_size=None, minimum_size=None): 
+    def __init__(self, endings_mappings, target_parent=os.getcwd(), maximum_size=None, minimum_size=None):
         """Copies the files macthing endings_mappings into target_parent
 
         endings_mappings is a dictionary of regex terms to file endings
@@ -290,7 +293,7 @@ class Copier(FileSizeChecker):
             raise Exception("endings_mappings must be a dictionary")
         for(regex, file_name) in endings_mappings.items():
             pattern = re.compile(regex)
-            self.endings_mappings[pattern] = file_name            
+            self.endings_mappings[pattern] = file_name
 
     def __act_on_files__(self, old_path, new_path, verbose=True):
         copy_if_new(old_path, new_path, verbose=verbose)
@@ -309,19 +312,20 @@ class Copier(FileSizeChecker):
                 if prefix[-1] == ".":
                     prefix = prefix[: -1]
                 if len(prefix) == 0:
-                    report_error("Ending regex: " + pattern.pattern + " was found at start of " + name )
+                    report_error("Ending regex: " + pattern.pattern + " was found at start of " + name)
                 oldpath = os.path.join(root, name)
                 if (self.size_wrong(oldpath)):
                     # Ignore directory but check its children!
                     if verbose:
                         print "ignoring", oldpath, "as it is the wrong size"
-                    return False                
+                    return False
                 newdir = os.path.join(self.target_parent, prefix)
                 if not os.path.isdir(newdir):
                     os.mkdir(newdir)
                 newpath = os.path.join(newdir, file_name)
-                return self.__act_on_files__(oldpath, newpath, verbose)     
+                return self.__act_on_files__(oldpath, newpath, verbose)
         return False
+
 
 class Linker(Copier):
     """Links the files into a file in a seperate directory"""
@@ -404,7 +408,7 @@ class Extractor(File_action):
                     if line.startswith(self.extract_prefix):
                         if summary:
                             raise Exception("Two lines found in" + path + " which start with " + self.extract_prefix)
-                        summary = line[len(self.extract_prefix): ]
+                        summary = line[len(self.extract_prefix):]
                         if self.strip:
                             summary = summary.strip()
             if summary:
@@ -471,6 +475,7 @@ class ByPrefixCombiner(File_action):
                 if verbose:
                     print path, "contained", count, "lines with", self.divider
 
+
 class Merger(FileSizeChecker):
     """Merges selected files into a single directory
 
@@ -500,20 +505,23 @@ class Merger(FileSizeChecker):
                 # Ignore directory but check its children!
                 if verbose:
                     print "ignoring", old_path, "as it is the wrong size"
-                return False                
+                return False
             new_name = os.path.basename(root) + self.file_mappings[name]
             new_path = os.path.join(self.target_parent, new_name)
+            if verbose:
+                print "coping", old_path
             copy_if_new(old_path, new_path, verbose=verbose)
+
 
 class Filter(FileSizeChecker):
     """Copies the files into seperate directories"""
-    def __init__(self, filter_mappings, keep_regexes, remove_regexes=list(), maximum_size=None, minimum_size=None, verbose=True): 
+    def __init__(self, filter_mappings, keep_regexes, remove_regexes=list(), maximum_size=None, minimum_size=None, verbose=True):
         """Copies the files matching endings_mappings based on keep_regexes and remove_regexs
 
         replace_mapping is a dictionary of regex terms to replacements
         Every time a file is found with matches the key a new file is
         created with the regex matched part of the name replaced by the value
-        
+
         Only lines that contain at least one of the keep patterns are copied.
         From these any part that matches any remove regex is replace by an empty string
 
@@ -586,11 +594,12 @@ class Filter(FileSizeChecker):
                     # Ignore directory but check its children!
                     if verbose:
                         print "ignoring", oldpath, "as it is the wrong size"
-                    return False                
+                    return False
                 newname = re.sub(pattern.pattern, replace, name)
                 newpath = os.path.join(root, newname)
-                return self.__copy_and_filter__(oldpath, newpath, verbose)     
+                return self.__copy_and_filter__(oldpath, newpath, verbose)
         return False
+
 
 def do_walk(source=os.getcwd(), directory_action=approve_all, file_action=print_size, onerror=None, followlinks=False, verbose=True):
     """
@@ -615,7 +624,7 @@ def do_walk(source=os.getcwd(), directory_action=approve_all, file_action=print_
     source = expanderuser(source)
     # Must be topdown=True otherwise walk will process subdirectories before checking them
     for root, dirs, files in os.walk(source, topdown=True, onerror=onerror, followlinks=followlinks):
-        dirs_clone = dirs[: ]
+        dirs_clone = dirs[:]
         for sub in dirs_clone:
             if not directory_action(root, sub, verbose=verbose):
                 if verbose:
@@ -703,7 +712,7 @@ __FILE_LIST__ = "FILE_LIST"
 __LISTp__ = "LIST"
 __KEEP_REGEX__ = "KEEP_REGEX"
 __MINIMUM_SIZE__ = "MINIMUM_SIZE"
-__MAXIMUM_SIZE__ = "MAXIMUM_SIZE"  #short = x
+__MAXIMUM_SIZE__ = "MAXIMUM_SIZE"  # short = x
 __OUTPUT_DIR__ = "OUTPUT_DIR"
 __PARENT__ = "PARENT"
 __QSUB_SCRIPT__ = "QSUB_SCRIPT"
@@ -721,7 +730,7 @@ if __name__ == '__main__':
     usage = "usage: %prog command(s) [options] \n" + \
             "Where command(s) is one or more of " + str(__COMMANDS__)
     parser = optparse.OptionParser(usage=usage)
-    parser.add_option(short(__VERBOSE__ ), longer(__VERBOSE__ ), action="store_true", dest=__VERBOSE__, default=False,
+    parser.add_option(short(__VERBOSE__), longer(__VERBOSE__), action="store_true", dest=__VERBOSE__, default=False,
                   help="If set will generate output of what the tool is doing.")
 
     find_group = optparse.OptionGroup(parser, __FIND__,
@@ -731,9 +740,8 @@ if __name__ == '__main__':
                     "a subdirectory of " + __PARENT__ + " to be created/used. "
                     "Anything after the pattern is ignored. "
                     "A new file is created with either a link or copy. "
-                    'Example: find --file_list="R1_001.fastq.gz:left.link" --file_list="R2_001.fastq.gz:right.link" '
-                    )
-    find_group.add_option(short(__SOURCE__), longer(__SOURCE__) , dest=__SOURCE__, action="store", type="string",
+                    'Example: find --file_list="R1_001.fastq.gz:left.link" --file_list="R2_001.fastq.gz:right.link" ')
+    find_group.add_option(short(__SOURCE__), longer(__SOURCE__), dest=__SOURCE__, action="store", type="string",
                   default=os.getcwd(),
                   help=__SOURCE__ + "directory that holds the raw data files. "
                   "Default is the current directory")
@@ -742,21 +750,21 @@ if __name__ == '__main__':
                   help=__PARENT__ + " directory of the sub directories to hold the data for each run "
                   "Default is the current directory")
     parent_option = find_group.get_option(longer(__PARENT__))
-    find_group.add_option(short(__FILE_LIST__), longer(__FILE_LIST__) , dest=__FILE_LIST__ , action="append", type="string",
+    find_group.add_option(short(__FILE_LIST__), longer(__FILE_LIST__), dest=__FILE_LIST__, action="append", type="string",
                   help="List of files to operate over. "
                        "If " + __FIND__ + " specified, format must be regex:name "
                        "If " + __MERGE__ + " is specified, format must be ending:name  "
                        "If " + __FILTER__ + " is specified, format must be regex:replacement  "
                        "Otherwise format can be just the name. "
                        "Multiple values allowed.")
-    file_list_option = find_group.get_option(longer(__FILE_LIST__ ))
-    find_group.add_option(short(__MINIMUM_SIZE__), longer(__MINIMUM_SIZE__) , dest=__MINIMUM_SIZE__ , action="store", type="long",
+    file_list_option = find_group.get_option(longer(__FILE_LIST__))
+    find_group.add_option(short(__MINIMUM_SIZE__), longer(__MINIMUM_SIZE__), dest=__MINIMUM_SIZE__, action="store", type="long",
                   help="Minimum size in bytes that a file must have to be used.")
     minimum_size_option = find_group.get_option(longer(__MINIMUM_SIZE__))
-    find_group.add_option("-X", longer(__MAXIMUM_SIZE__) , dest=__MAXIMUM_SIZE__ , action="store", type="long",
+    find_group.add_option("-X", longer(__MAXIMUM_SIZE__), dest=__MAXIMUM_SIZE__, action="store", type="long",
                   help="Maximum size in bytes that a file must have to be used.")
     maximum_size_option = find_group.get_option(longer(__MAXIMUM_SIZE__))
-    
+
     find_group.add_option(short(__COPY__), longer(__COPY__), action="store_true", dest=__COPY__, default=False,
                   help="(Optional) If specified will copy the original file to the new location. "
                        "Otherwise just the path to the original file is saved.")
@@ -767,8 +775,7 @@ if __name__ == '__main__':
                      "(including subdirectories) in " + __PARENT__ + " directory"
                      "But only includes the directories that contain a  files in " + __FILE_LIST__ + "(s)"
                      "This list is writen to the path specified as " + __LISTp__ + "  "
-                     'Example: list --file_list="left.link" --file_list="right.link"'
-                     )
+                     'Example: list --file_list="left.link" --file_list="right.link"')
     list_group.option_list.append(parent_option)
     list_group.option_list.append(file_list_option)
     list_group.option_list.append(minimum_size_option)
@@ -799,7 +806,7 @@ if __name__ == '__main__':
                      "whose name are in the " + __FILE_LIST__ + "(s)"
                      "Looking for a line that begins with the " + __EXTRACT_PREFIX__ + " "
                      "These will be written to a file called " + __EXTRACT_PREFIX__ + ".tsv "
-                     "Placed in the " + __OUTPUT_DIR__ )
+                     "Placed in the " + __OUTPUT_DIR__)
     extract_group.option_list.append(parent_option)
     extract_group.option_list.append(file_list_option)
     extract_group.add_option(short(__EXTRACT_PREFIX__), longer(__EXTRACT_PREFIX__), dest=__EXTRACT_PREFIX__,
@@ -818,7 +825,7 @@ if __name__ == '__main__':
                      "Looking for lines with the delimiter in them."
                      "Saving what comes after the " + __DELIMITER__ + " +  in a file whose "
                      "name is based on what comes before the delimieter"
-                     "Placed in the " + __OUTPUT_DIR__ )
+                     "Placed in the " + __OUTPUT_DIR__)
     delimit_group.option_list.append(parent_option)
     delimit_group.option_list.append(file_list_option)
     delimit_group.add_option(short(__DELIMITER__), longer(__DELIMITER__), dest=__DELIMITER__, action="store", type="string",
@@ -834,29 +841,31 @@ if __name__ == '__main__':
                      "whose name are in the name part of " + __FILE_LIST__ + "(s) "
                      "Coping these with a file whose name is based on the directory "
                      "and the ending part of " + __FILE_LIST__ + "(s) "
-                     "Placed in the " + __OUTPUT_DIR__ )
+                     "Placed in the " + __OUTPUT_DIR__)
     merge_group.option_list.append(parent_option)
     merge_group.option_list.append(file_list_option)
     merge_group.option_list.append(output_option)
+    merge_group.option_list.append(minimum_size_option)
+    merge_group.option_list.append(maximum_size_option)
     parser.add_option_group(merge_group)
 
     filter_group = optparse.OptionGroup(parser, __FILTER__,
                      "Filters files found in the " + __PARENT__ + " directory (and sub directories) "
                      "whose name match the regex part of " + __FILE_LIST__ + "(s) "
                      "Coping these with a file whose name is the regex part replaced with the replacement part of " + __FILE_LIST__ + ". "
-                     "Placed in the " + __OUTPUT_DIR__ )
+                     "Placed in the " + __OUTPUT_DIR__)
     filter_group.option_list.append(parent_option)
     filter_group.option_list.append(file_list_option)
     filter_group.add_option(short(__KEEP_REGEX__), longer(__KEEP_REGEX__), dest=__KEEP_REGEX__, action="append", type="string",
-                  help="Regex pattern to idenfity a line that should be kept. "
-                       "Multiple values are allowed in which case any line which has any of the values is kept.")
+                     help="Regex pattern to idenfity a line that should be kept. "
+                          "Multiple values are allowed in which case any line which has any of the values is kept.")
     filter_group.add_option(short(__REMOVE_REGEX__), longer(__REMOVE_REGEX__), dest=__REMOVE_REGEX__, action="append", type="string",
-                  help="Regex pattern to idenfity parts of the lines to remove. "
-                       "Multiple values are allowed in which they are applied in the order provided." 
-                       "The same pattern can be used for both a " + __KEEP_REGEX__ + " and a " + __REMOVE_REGEX__ + ". ")
+                     help="Regex pattern to idenfity parts of the lines to remove. "
+                          "Multiple values are allowed in which they are applied in the order provided."
+                          "The same pattern can be used for both a " + __KEEP_REGEX__ + " and a " + __REMOVE_REGEX__ + ". ")
     filter_group.option_list.append(output_option)
     parser.add_option_group(filter_group)
-    
+
     (options, args) = parser.parse_args()
 
     if len(args) == 0:
@@ -946,8 +955,8 @@ if __name__ == '__main__':
         print "Writing list of directories in", options.__dict__[__PARENT__], "to", options.__dict__[__LISTp__]
         print "Only directories that have all these files are included: "
         print required_files
-        lister = DirectoryLister(list_file=options.__dict__[__LISTp__], required_files=required_files, 
-                                 minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__]) 
+        lister = DirectoryLister(list_file=options.__dict__[__LISTp__], required_files=required_files,
+                                 minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__])
         do_walk(source=options.__dict__[__PARENT__], directory_action=lister.list_directory, file_action=approve_none,
                 verbose=options.__dict__[__VERBOSE__])
         if options.__dict__[__VERBOSE__]:
@@ -960,7 +969,7 @@ if __name__ == '__main__':
             batch = options.__dict__[__BATCH_SCRIPT__]
         else:
             batch = options.__dict__[__QSUB_SCRIPT__] + "_batch"
-        print "Writing new",__BATCH_SCRIPT__,"to", batch
+        print "Writing new", __BATCH_SCRIPT__, "to", batch
         print "Based on", __QSUB_SCRIPT__, options.__dict__[__QSUB_SCRIPT__]
         print "Using directory LIST", options.__dict__[__LISTp__]
         update_script(options.__dict__[__QSUB_SCRIPT__], batch, options.__dict__[__LISTp__])
@@ -999,7 +1008,7 @@ if __name__ == '__main__':
 
     if __MERGE__ in args:
         print "Coping files to ", options.__dict__[__OUTPUT_DIR__]
-        merger = Merger(file_mappings, options.__dict__[__OUTPUT_DIR__], 
+        merger = Merger(file_mappings, options.__dict__[__OUTPUT_DIR__],
                         minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__])
         do_walk(source=options.__dict__[__PARENT__], directory_action=approve_all,
                 file_action=merger.copy_files, verbose=options.__dict__[__VERBOSE__])
@@ -1011,15 +1020,14 @@ if __name__ == '__main__':
             report_error(__FILTER__ + " selected but no " + __PARENT__ + " parameter provided")
         print "Coping and filtering files to ", options.__dict__[__PARENT__]
         if not filter_mappings:
-            report_error(__FILTER__ + " selected  but no "+ __FILE_LIST__ + " parameter provided")
+            report_error(__FILTER__ + " selected  but no " + __FILE_LIST__ + " parameter provided")
         if not options.__dict__[__KEEP_REGEX__]:
             report_error(__FILTER__ + " selected but no " + __KEEP_REGEX__ + " parameter provided")
         if not options.__dict__[__REMOVE_REGEX__]:
-             options.__dict__[__REMOVE_REGEX__] = list()
-        filter = Filter(filter_mappings, options.__dict__[__KEEP_REGEX__], options.__dict__[__REMOVE_REGEX__],  
+            options.__dict__[__REMOVE_REGEX__] = list()
+        filter = Filter(filter_mappings, options.__dict__[__KEEP_REGEX__], options.__dict__[__REMOVE_REGEX__],
                         minimum_size=options.__dict__[__MINIMUM_SIZE__], maximum_size=options.__dict__[__MAXIMUM_SIZE__], verbose=options.__dict__[__VERBOSE__])
         do_walk(source=options.__dict__[__PARENT__], directory_action=approve_all,
                 file_action=filter.file_action, verbose=options.__dict__[__VERBOSE__])
         if options.__dict__[__VERBOSE__]:
             print
-
